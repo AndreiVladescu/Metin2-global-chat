@@ -1,0 +1,109 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgresapache
+  labels:
+    app: postgres
+spec:
+  externalIPs:
+    - 10.0.0.5
+  ports:
+    - port: 5432
+  selector:
+    app: postgres
+    tier: postgreSQL
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgresapache
+  labels:
+    app: postgres
+spec:
+  selector:
+    matchLabels:
+      app: postgres
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: postgres
+        tier: postgreSQL
+    spec:
+      containers:
+        - image: postgres:9.6.2-alpine
+          name: postgresapache
+          env:
+            - name: POSTGRES_USER
+              value: apache
+            - name: POSTGRES_PASSWORD
+              value: apache
+            - name: POSTGRES_DB
+              value: apache
+          ports:
+            - containerPort: 5432
+              name: postgresapache
+          volumeMounts:
+            - name: postgresapache
+              mountPath: /var/lib/postgresql/data
+      volumes:
+        - name: postgresapache
+          persistentVolumeClaim:
+            claimName: postgres-claim
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-claim
+  labels:
+    app: postgresapache
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: apache
+  labels:
+    app: apache
+spec:
+  externalIPs:
+    - 10.0.0.5
+  ports:
+    - port: 88
+      protocol: TCP
+      targetPort: 80
+  selector:
+    app: apache
+status:
+  loadBalancer: {}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: apache
+  name: apache
+spec:
+  replicas: 5
+  selector:
+    matchLabels:
+      app: apache
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        app: apache
+    spec:
+      containers:
+        - image: localhost:32000/apache
+          name: apache
+          resources: {}
+status: {}
+---
